@@ -48,6 +48,9 @@ app.layout = html.Div(
             "Ten projekt ma na celu analizę danych związanych z przestępnościami w określonym regionie. Celem jest przewidzenie grupy przestępstw na podstawie dostępnych cech numerycznych i kategorycznych.",
             style={'color': colors['text']}),
 
+        html.H2("Heatmapa", style={'color': 'black', 'margin-top': '40px'}),
+        html.Iframe(srcDoc=open('heatmap.html', 'r').read(), width='100%', height='500px'),
+
         html.H2("Wizualizacja danych", style={'color': colors['text'], 'margin-top': '40px'}),
 
         html.Div([
