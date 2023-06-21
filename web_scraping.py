@@ -36,7 +36,12 @@ download_url = download_link.get_attribute("href")
 
 response = requests.get(download_url)
 file_name = os.path.basename(download_url)
-with open(file_name, "wb") as file:
+
+new_file_name = "gun_pointed"
+file_name_parts = os.path.splitext(file_name)
+new_file_name_with_extension = new_file_name + file_name_parts[1]
+
+with open(new_file_name_with_extension, "wb") as file:
     file.write(response.content)
 
 driver.quit()

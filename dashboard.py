@@ -6,21 +6,11 @@ from dash.dependencies import Input, Output
 
 app = dash.Dash(__name__)
 
-df = pd.read_csv('pgp_pointed-gun-at-person-details_pgpdetail.csv')
-
-plotly_style = {
-    'height': 400,
-    'margin': {'autoexpand': True, 'b': 10, 'l': 10, 'r': 10, 't': 10}
-}
+df = pd.read_csv('gun_pointed.csv')
 
 colors = {
     'background': '#f9f9f9',
     'text': '#333',
-    'plot_bgcolor': '#fff',
-    'paper_bgcolor': '#f8f9fa',
-    'font_color': '#333',
-    'table_header_bg': '#f2f2f2',
-    'table_header_font_color': '#333',
 }
 
 external_stylesheets = [
@@ -45,7 +35,7 @@ app.layout = html.Div(
 
         html.H2("Opis projektu", style={'color': colors['text'], 'margin-top': '40px'}),
         html.P(
-            "Ten projekt ma na celu analizę danych związanych z przestępnościami w określonym regionie. Celem jest przewidzenie grupy przestępstw na podstawie dostępnych cech numerycznych i kategorycznych.",
+            "Ten projekt ma na celu analizę danych związanych z przestępnościami w mieście Phoenix. Celem jest przewidzenie grupy na podstawie dostępnych cech numerycznych i kategorycznych.",
             style={'color': colors['text']}),
 
         html.H2("Heatmapa", style={'color': 'black', 'margin-top': '40px'}),
@@ -69,82 +59,124 @@ app.layout = html.Div(
             dcc.Dropdown(
                 id='y-axis-selector',
                 options=[{'label': col, 'value': col} for col in df.columns],
-                value='INC_YEAR',
+                value='PGP_COUNT',
                 clearable=False,
                 style={'width': '200px'}
             )
         ], style={'margin-bottom': '20px'}),
 
         html.Div([
-            html.Label('Typ wykresu:', style={'color': colors['text']}),
-            dcc.Dropdown(
+            html.Label('Rodzaj wykresu:', style={'color': colors['text']}),
+            dcc.RadioItems(
                 id='chart-type-selector',
                 options=[
-                    {'label': 'Scatter', 'value': 'scatter'},
-                    {'label': 'Bar', 'value': 'bar'},
-                    {'label': 'Line', 'value': 'line'}
+                    {'label': 'Wykres punktowy', 'value': 'scatter'},
+                    {'label': 'Wykres słupkowy', 'value': 'bar'},
+                    {'label': 'Histogram', 'value': 'histogram'}
                 ],
                 value='scatter',
-                clearable=False,
+                labelStyle={'display': 'block'},
                 style={'width': '200px'}
             )
-        ], style={'margin-bottom': '20px'}),
+        ], style={'margin-bottom': '40px'}),
 
-        dcc.Graph(id='chart-container', style=plotly_style),
+        html.Div(id='chart-container'),
 
-        html.H2("Podsumowanie dla osi Y", style={'color': colors['text'], 'margin-top': '40px'}),
-        html.P(f"Podsumowanie dla osi Y: ", id='y-axis-summary', style={'color': colors['text'], 'margin-bottom': '10px'}),
+        html.H2("Podsumowanie danych", style={'color': colors['text'], 'margin-top': '40px'}),
+
+        html.Div(id='data-summary')
     ]
 )
 
 
 @app.callback(
-    [Output('chart-container', 'figure'),
-     Output('y-axis-summary', 'children')],
-    [Input('x-axis-selector', 'value'),
-     Input('y-axis-selector', 'value'),
-     Input('chart-type-selector', 'value')]
+    Output('chart-container', 'children'),
+    Input('x-axis-selector', 'value'),
+    Input('y-axis-selector', 'value'),
+    Input('chart-type-selector', 'value')
 )
 def update_chart(x_axis, y_axis, chart_type):
     if not x_axis or not y_axis:
-        return px.scatter(), ""
+        return html.Div()
 
     if chart_type == 'scatter':
-        chart_func = px.scatter
+        fig = px.scatter(df, x=x_axis, y=y_axis, color='SIMPLE_SUBJ_RE_GRP', title='Wykres punktowy')
     elif chart_type == 'bar':
-        chart_func = px.bar
-    elif chart_type == 'line':
-        chart_func = px.line
+        fig = px.bar(df, x=x_axis, y=y_axis, color='SIMPLE_SUBJ_RE_GRP', title='Wykres słupkowy')
     else:
-        chart_func = px.scatter
+        fig = px.histogram(df, x=x_axis, y=y_axis, color='SIMPLE_SUBJ_RE_GRP', title='Histogram')
 
-    fig = chart_func(df, x=x_axis, y=y_axis, color='SIMPLE_SUBJ_RE_GRP', title='Wykres punktowy')
-    fig.update_layout(
-        plot_bgcolor=colors['plot_bgcolor'],
-        paper_bgcolor=colors['paper_bgcolor'],
-        font=dict(color=colors['font_color'])
-    )
-
-    y_summary = df.groupby(y_axis).size().reset_index(name='Count')
-
-    return fig, generate_summary_table(y_summary)
+    chart = dcc.Graph(figure=fig)
+    return chart
 
 
-def generate_summary_table(data_frame):
-    table_header = [
-        html.Th(col, style={'background-color': colors['table_header_bg'], 'color': colors['table_header_font_color']}) for col in data_frame.columns
-    ]
+@app.callback(
+    Output('data-summary', 'children'),
+    Input('x-axis-selector', 'value'),
+    Input('y-axis-selector', 'value')
+)
+def update_data_summary(x_axis, y_axis):
+    if not x_axis or not y_axis:
+        return html.Div()
 
-    table_body = [
-        html.Tr([
-            html.Td(data_frame.iloc[row_index][col_index]) for col_index in range(len(data_frame.columns))
-        ]) for row_index in range(len(data_frame))
-    ]
+    x_axis_description = {
+        'INC_IR_NO': 'Numer zdarzenia',
+        'INC_DATE': 'Data zdarzenia',
+        'INC_YEAR': 'Rok zdarzenia',
+        'INC_TIME': 'Godzina zdarzenia',
+        'INC_DAY_WEEK': 'Dzień tygodnia',
+        'INC_LOC_COUNTY': 'Sektor miasta',
+        'HUNDRED_BLOCK': 'Adres zdarzenia',
+        'INC_CITY': 'Nazwa miasta',
+        'INC_STATE': 'Stan',
+        'INC_ZIPCODE': 'Kod pocztowy',
+        'INC_PRECINCT': 'Obszar zdarzenia',
+        'CIT_NUMBER': 'ID osoby',
+        'CIT_GENDER': 'Płeć osoby',
+        'CIT_AGE': 'Wiek osoby',
+        'SUBJ_AGE_GROUP': 'Przedział wiekowy',
+        'CIT_RACE': 'Rasa',
+        'CIT_ETHNICITY': 'Pochodzenie',
+        'SIMPLE_SUBJ_RE_GRP': 'Rasa/Pochodzenie',
+        'CITIZEN_CHARGE': 'Zarzut'
+    }
 
-    return html.Table([
-        html.Thead(table_header),
-        html.Tbody(table_body)
-    ])
+    y_axis_description = {
+        'INC_IR_NO': 'Numer zdarzenia',
+        'INC_DATE': 'Data zdarzenia',
+        'INC_YEAR': 'Rok zdarzenia',
+        'INC_TIME': 'Godzina zdarzenia',
+        'INC_DAY_WEEK': 'Dzień tygodnia',
+        'INC_LOC_COUNTY': 'Sektor miasta',
+        'HUNDRED_BLOCK': 'Adres zdarzenia',
+        'INC_CITY': 'Nazwa miasta',
+        'INC_STATE': 'Stan',
+        'INC_ZIPCODE': 'Kod pocztowy',
+        'INC_PRECINCT': 'Obszar zdarzenia',
+        'CIT_NUMBER': 'ID osoby',
+        'CIT_GENDER': 'Płeć osoby',
+        'CIT_AGE': 'Wiek osoby',
+        'SUBJ_AGE_GROUP': 'Przedział wiekowy',
+        'CIT_RACE': 'Rasa',
+        'CIT_ETHNICITY': 'Pochodzenie',
+        'SIMPLE_SUBJ_RE_GRP': 'Rasa/Pochodzenie',
+        'CITIZEN_CHARGE': 'Zarzut'
+    }
+
+    if x_axis in x_axis_description:
+        x_axis_label = f"{x_axis} - {x_axis_description[x_axis]}"
+    else:
+        x_axis_label = x_axis
+
+    if y_axis in y_axis_description:
+        y_axis_label = f"{y_axis} - {y_axis_description[y_axis]}"
+    else:
+        y_axis_label = y_axis
+
+    x_axis_summary = html.P(f"{x_axis_label}", style={'margin-bottom': '10px'})
+    y_axis_summary = html.P(f"{y_axis_label}", style={'margin-bottom': '10px'})
+    summary = html.Div([x_axis_summary, y_axis_summary])
+    return summary
 
 
 if __name__ == '__main__':
