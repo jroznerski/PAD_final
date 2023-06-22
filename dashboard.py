@@ -7,10 +7,24 @@ from dash.dependencies import Input, Output
 app = dash.Dash(__name__)
 
 df = pd.read_csv('gun_pointed.csv')
+df['INC_DATE'] = pd.to_datetime(df['INC_DATE'], format='%m/%d/%Y').dt.strftime('%d/%m/%Y')
+df['CIT_RACE'] = df['CIT_RACE'].replace('Not Available', 'Unknown')
+df['INC_ZIPCODE'] = df['INC_ZIPCODE'].replace('Not Available', float('NaN')).astype(float)
+df['INC_CITY'] = df['INC_CITY'].str.title()
+df['INC_CITY'] = df['INC_CITY'].replace(['Phx', 'Phoeix', 'Phoeniz', 'Phoenx', 'Pheonix', 'Phoenxi', 'Phoneix'], 'Phoenix')
+df['CIT_AGE'] = df['CIT_AGE'].replace('Not Available', float('NaN')).astype(float)
+df = df.drop(df[(df['CIT_AGE'] == 31.8) | (df['CIT_AGE'] == 121)].index)
+df = df[df['CIT_AGE'] >= 14.0]
+df['CIT_AGE'].fillna(round(df['CIT_AGE'].mean(), 1), inplace=True)
+df['HUNDRED_BLOCK'] = df['HUNDRED_BLOCK'].str.split(' ', n=1).str[1]
+df = df[df['CIT_GENDER'] != 'Not Available']
+df['INC_CITY'] = df['INC_CITY'].replace('Not Available', 'Unknown')
+df['INC_PRECINCT'] = df['INC_PRECINCT'].replace('Not Available', 'Unknown')
 
 colors = {
     'background': '#f9f9f9',
     'text': '#333',
+    'plot_background': '#fff'
 }
 
 external_stylesheets = [
@@ -72,7 +86,6 @@ app.layout = html.Div(
                 options=[
                     {'label': 'Wykres punktowy', 'value': 'scatter'},
                     {'label': 'Wykres słupkowy', 'value': 'bar'},
-                    {'label': 'Histogram', 'value': 'histogram'}
                 ],
                 value='scatter',
                 labelStyle={'display': 'block'},
@@ -103,8 +116,7 @@ def update_chart(x_axis, y_axis, chart_type):
         fig = px.scatter(df, x=x_axis, y=y_axis, color='SIMPLE_SUBJ_RE_GRP', title='Wykres punktowy')
     elif chart_type == 'bar':
         fig = px.bar(df, x=x_axis, y=y_axis, color='SIMPLE_SUBJ_RE_GRP', title='Wykres słupkowy')
-    else:
-        fig = px.histogram(df, x=x_axis, y=y_axis, color='SIMPLE_SUBJ_RE_GRP', title='Histogram')
+        fig.update_yaxes(title_text='Count')  # Add y-axis title for count
 
     chart = dcc.Graph(figure=fig)
     return chart
